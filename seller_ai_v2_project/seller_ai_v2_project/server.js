@@ -15,25 +15,33 @@ function clean(value, max = 2000) {
   return String(value || '').trim().slice(0, max);
 }
 
-function fallback(name, category, features, audience) {
-  const specs = features
-    .split(/[,.;\n]+/)
-    .map(x => x.trim())
+function parseFeatures(features) {
+  return features
+    .split(/[,;\n]+/)
+    .map(x => x.trim().replace(/\s+/g, ' '))
     .filter(Boolean)
-    .slice(0, 7);
+    .slice(0, 10);
+}
+
+function fallback(name, category, features, audience) {
+  const specs = parseFeatures(features);
+
+  const description = specs.length
+    ? `${name}${category ? ` из категории «${category}»` : ''}. Характеристики: ${specs.join('; ')}.`
+    : `${name}. Добавьте характеристики товара, чтобы подготовить подробное описание для покупателей.`;
 
   return {
-    title: `${name} — описание и характеристики товара`.slice(0, 120),
-    description: specs.length
-      ? `${name}${category ? ` из категории «${category}»` : ''}. ${specs.join('. ')}.`
-      : `${name}. Добавьте характеристики товара, чтобы подготовить подробное описание для покупателей.`,
-    desc: specs.length
-      ? `${name}${category ? ` из категории «${category}»` : ''}. ${specs.join('. ')}.`
-      : `${name}. Добавьте характеристики товара для подробного описания.`,
+    title: `${name} — характеристики и описание товара`.slice(0, 120),
+    description,
+    desc: description,
     benefits: specs.length
-      ? specs
-      : ['Добавьте характеристики, чтобы сформировать преимущества товара.'],
-    keywords: [name, category].filter(Boolean).join(', '),
+      ? specs.map(spec => `Характеристика: ${spec}`)
+      : ['Добавьте характеристики товара для формирования преимуществ.'],
+    keywords: [
+      name,
+      category,
+      ...specs
+    ].filter(Boolean).join(', '),
     demo: true
   };
 }
@@ -99,11 +107,12 @@ app.post('/api/generate', async (req, res) => {
 - Не придумывай материалы, размеры и функции.
 - Не используй бессмысленные рекламные фразы.
 - Исправляй грамматические ошибки.
-- Не повторяй одни и те же слова без необходимости.
+- Не повторяй одни и те же слова.
+- Сохраняй версии и числа, например Bluetooth 5.3.
 - Если информации недостаточно, не делай неподтверждённых заявлений.
 - Не добавляй Markdown.
 
-Верни только JSON следующего формата:
+Верни только JSON:
 {
   "title": "Заголовок",
   "description": "Описание",
