@@ -1,5 +1,4 @@
 
-
 const express = require('express');
 const path = require('path');
 
@@ -26,19 +25,22 @@ function parseFeatures(features) {
 
 function fallback(name, category, features) {
   const specs = parseFeatures(features);
-
   const description = specs.length
     ? `${name}${category ? ` из категории «${category}»` : ''}. Характеристики: ${specs.join('; ')}.`
-    : `${name}. Добавьте характеристики товара для создания подробного описания.`;
+    : `${name}. Добавьте характеристики товара для создания описания.`;
 
   return {
     title: `${name} — описание и характеристики`.slice(0, 120),
     description,
     desc: description,
-    benefits: specs.length
-      ? specs.map(x => `Характеристика товара: ${x}`)
-      : ['Добавьте характеристики товара для создания преимуществ.'],
+    benefits: specs.map(x => `Характеристика: ${x}`),
     keywords: [name, category, ...specs].filter(Boolean).join(', '),
+    verification: {
+      available: false,
+      score: null,
+      claims: [],
+      note: 'AI-проверка недоступна в демо-режиме.'
+    },
     demo: true
   };
 }
@@ -61,9 +63,7 @@ app.post('/api/generate', async (req, res) => {
   const marketplace = clean(platform, 100);
 
   if (!product) {
-    return res.status(400).json({
-      error: 'Название товара обязательно'
-    });
+    return res.status(400).json({ error: 'Название товара обязательно' });
   }
 
   const base = process.env.AI_BASE_URL;
@@ -83,53 +83,53 @@ app.post('/api/generate', async (req, res) => {
           signal: AbortSignal.timeout(30000),
           body: JSON.stringify({
             model,
-            temperature: 0.3,
+            temperature: 0.2,
             messages: [
               {
                 role: 'system',
                 content: `
-Ты профессиональный редактор карточек товаров
-для маркетплейсов Wildberries и Ozon.
+Ты редактор карточек товаров маркетплейсов.
 
-Пиши исключительно грамотным русским языком.
+Создай заголовок, описание, преимущества и SEO-фразы.
 
-Твоя задача:
-1. Создать понятный заголовок до 120 символов.
-2. Написать подробное описание товара.
-3. Составить преимущества на основе предоставленных характеристик.
-4. Подобрать релевантные поисковые фразы.
+Используй исключительно предоставленные характеристики.
+Не выдумывай функции, свойства, материалы, размеры,
+комплектацию и технические возможности.
 
-ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:
+Затем проверь каждое фактическое утверждение
+в созданном заголовке, описании и преимуществах.
 
-- Используй только факты из входных данных.
-- Никогда не выдумывай функции, материалы, размеры,
-  комплектацию, сроки работы и другие характеристики.
-- Не приписывай товару быструю зарядку, защиту от воды,
-  высокое качество звука или другие свойства,
-  если они прямо не указаны.
-- Не превращай характеристику в неподтверждённое обещание.
-- Не используй слова «премиальный», «лучший»,
-  «идеальный», если это не подтверждено данными.
-- Сохраняй точные обозначения и числа:
-  например, Bluetooth 5.3 нельзя менять на Bluetooth 5.
-- Не добавляй характеристики в SEO-фразы,
-  если их нет во входных данных.
-- Не повторяй одинаковые ключевые слова.
-- Не добавляй нерелевантные запросы вроде «подарок»
-  или «для всех».
-- Учитывай выбранный маркетплейс, аудиторию и стиль.
-- Если данных мало, пиши кратко и честно.
-- Не нужно искусственно создавать 7 преимуществ,
-  если для них недостаточно подтверждённых фактов.
-- Не используй Markdown.
+Статусы:
+- supported: прямо подтверждается входными данными.
+- unverified: отсутствует подтверждение во входных данных.
 
-Верни исключительно корректный JSON следующего вида:
+Не считай общие рекламные слова доказанными фактами.
+Не выдавай предположение за подтверждённую характеристику.
 
+Оценка score — процент утверждений со статусом supported.
+Если фактических утверждений нет, score должен быть null.
+
+Верни только JSON:
 {
-  "title": "Заголовок товара",
-  "description": "Описание товара",
-  "benefits": ["Преимущество 1", "Преимущество 2"],
-  "keywords": ["Поисковая фраза 1", "Поисковая фраза 2"]
+  "title": "Заголовок",
+  "description": "Описание",
+  "benefits": ["Преимущество"],
+  "keywords": ["Фраза"],
+  "verification": {
+    "score": 80,
+    "claims": [
+      {
+        "text": "Bluetooth 5.3",
+        "status": "supported",
+        "reason": "Указано во входных характеристиках"
+      },
+      {
+        "text": "Низкая задержка",
+        "status": "unverified",
+        "reason": "Такое свойство не указано во входных данных"
+      }
+    ]
+  }
 }
 `
               },
@@ -150,14 +150,10 @@ app.post('/api/generate', async (req, res) => {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `AI provider returned ${response.status}: ${errorText.slice(0, 300)}`
-        );
+        throw new Error(`AI provider returned ${response.status}`);
       }
 
       const data = await response.json();
-
       let content = data.choices?.[0]?.message?.content || '';
 
       content = content
@@ -176,25 +172,52 @@ app.post('/api/generate', async (req, res) => {
         throw new Error('Invalid AI response format');
       }
 
-      const finalResult = {
-        title: clean(result.title, 120),
-        description: clean(result.description, 5000),
-        desc: clean(result.description, 5000),
-        benefits: result.benefits
-          .filter(x => typeof x === 'string')
-          .map(x => clean(x, 300))
-          .filter(Boolean)
-          .slice(0, 7),
-        keywords: result.keywords
-          .filter(x => typeof x === 'string')
-          .map(x => clean(x, 100))
-          .filter(Boolean)
-          .slice(0, 20)
-          .join(', '),
-        demo: false
-      };
+      const rawVerification = result.verification || {};
+      const claims = Array.isArray(rawVerification.claims)
+        ? rawVerification.claims
+            .filter(x =>
+              x &&
+              typeof x.text === 'string' &&
+              ['supported', 'unverified'].includes(x.status)
+            )
+            .map(x => ({
+              text: clean(x.text, 300),
+              status: x.status,
+              reason: clean(x.reason, 500)
+            }))
+            .slice(0, 30)
+        : [];
 
-      return res.json({ result: finalResult });
+      const checked = claims.filter(x => x.status === 'supported').length;
+      const score = claims.length
+        ? Math.round(checked / claims.length * 100)
+        : null;
+
+      return res.json({
+        result: {
+          title: clean(result.title, 120),
+          description: clean(result.description, 5000),
+          desc: clean(result.description, 5000),
+          benefits: result.benefits
+            .filter(x => typeof x === 'string')
+            .map(x => clean(x, 300))
+            .filter(Boolean)
+            .slice(0, 7),
+          keywords: result.keywords
+            .filter(x => typeof x === 'string')
+            .map(x => clean(x, 100))
+            .filter(Boolean)
+            .slice(0, 20)
+            .join(', '),
+          verification: {
+            available: true,
+            score,
+            claims,
+            note: 'Оценка показывает соответствие исходным данным, а не фактическую проверку товара.'
+          },
+          demo: false
+        }
+      });
 
     } catch (error) {
       console.error('AI generation failed:', error.message);
@@ -202,11 +225,7 @@ app.post('/api/generate', async (req, res) => {
   }
 
   return res.json({
-    result: fallback(
-      product,
-      productCategory,
-      productFeatures
-    )
+    result: fallback(product, productCategory, productFeatures)
   });
 });
 
