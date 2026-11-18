@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090812">
+<title>SELLER AI — генератор карточек</title>
+<style>
+:root{color-scheme:dark;--bg:#090812;--panel:#121020;--line:#29233d;--muted:#aaa4bf;--purple:#9b6cff;--cyan:#55e5ee}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#24133d 0,transparent 35%),radial-gradient(circle at 90% 15%,#102d3b 0,transparent 30%),var(--bg);color:#f7f4ff;font:15px Inter,system-ui,Arial,sans-serif;min-height:100vh}
+header{max-width:1120px;margin:auto;padding:26px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-size:22px;font-weight:900;letter-spacing:1px}.brand span{color:var(--cyan)}.tag{color:var(--muted);font-size:12px}
+main{max-width:1120px;margin:20px auto;padding:0 22px 60px}.hero{margin:30px 0 24px}.hero h1{font-size:clamp(32px,6vw,56px);line-height:1.02;margin:0 0 12px}.gradient{background:linear-gradient(90deg,#bd8aff,var(--cyan));-webkit-background-clip:text;color:transparent}.hero p{color:var(--muted);max-width:650px;line-height:1.6}
+.layout{display:grid;grid-template-columns: minmax(280px,.9fr) minmax(320px,1.1fr);gap:18px}.card{background:#121020eF;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 18px 60px #0005}.card h2{font-size:18px;margin:0 0 18px}
+label{display:block;font-size:13px;color:#d6d0e5;margin:14px 0 7px}input,textarea,select{width:100%;background:#0b0914;color:white;border:1px solid #39314f;border-radius:11px;padding:12px;font:inherit;outline:none}input:focus,textarea:focus,select:focus{border-color:var(--purple)}textarea{min-height:90px;resize:vertical}.platforms{display:flex;gap:8px}.platforms button,.small{background:#1b1730;border:1px solid #3b3158;color:#ddd5f4;border-radius:10px;padding:10px 14px;cursor:pointer}.platforms button.active{border-color:var(--cyan);color:var(--cyan)}.primary{width:100%;border:0;border-radius:12px;padding:14px;margin-top:18px;font-weight:800;color:#100b1d;background:linear-gradient(90deg,#b58aff,#5de5ec);cursor:pointer}.primary:disabled{opacity:.6;cursor:wait}.result{min-height:250px}.empty{color:var(--muted);line-height:1.6;padding:25px 0}.out h3{font-size:14px;color:var(--cyan);margin:18px 0 7px}.out p{white-space:pre-wrap;line-height:1.55;margin:0;color:#eee9fa}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.history{margin-top:18px}.history-item{padding:10px 0;border-top:1px solid var(--line);color:#d9d2e9;font-size:13px}.foot{color:#77718c;font-size:12px;margin-top:22px;line-height:1.6}
+@media(max-width:760px){.layout{grid-template-columns:1fr}header{padding:20px}.hero{margin-top:18px}main{padding:0 14px 40px}.card{padding:18px}}
+</style>
+</head>
+<body>
+<header><div class="brand">SELLER <span>AI</span></div><div class="tag">PRODUCT CONTENT STUDIO</div></header>
+<main>
+<section class="hero"><h1>Карточки товаров.<br><span class="gradient">Быстрее и понятнее.</span></h1><p>Создавай черновики заголовков, описаний, преимуществ и поисковых фраз для маркетплейсов. Проверь результат и адаптируй его под свой товар.</p></section>
+<div class="layout">
+<section class="card">
+<h2>Параметры товара</h2>
+<div class="platforms"><button class="active" data-platform="Wildberries">Wildberries</button><button data-platform="Ozon">Ozon</button></div>
+<label for="name">Название товара *</label><input id="name" placeholder="Например, термокружка">
+<label for="category">Категория</label><input id="category" placeholder="Посуда">
+<label for="features">Характеристики и особенности</label><textarea id="features" placeholder="Объём 450 мл, нержавеющая сталь, герметичная крышка..."></textarea>
+<label for="audience">Для кого товар</label><input id="audience" placeholder="Для офиса, поездок и прогулок">
+<label for="tone">Стиль текста</label><select id="tone"><option value="Убедительный и понятный">Убедительный и понятный</option><option value="Краткий и деловой">Краткий и деловой</option><option value="Дружелюбный">Дружелюбный</option></select>
+<button class="primary" id="generate">СОЗДАТЬ КАРТОЧКУ</button>
+<div class="foot">Демо-режим: без подключения AI API используются шаблоны. Не добавляй неподтверждённые характеристики товара.</div>
+</section>
+<section class="card result">
+<h2>Результат генерации</h2>
+<div id="output" class="empty">Заполни информацию о товаре и нажми «Создать карточку». Здесь появится черновик для редактирования.</div>
+<div class="actions" id="actions" hidden><button class="small" id="copy">Копировать текст</button><button class="small" id="download">Скачать TXT</button></div>
+<div class="history"><h2>Недавние генерации</h2><div id="history" class="empty">История пока пуста.</div></div>
+</section>
+</div>
+</main>
+<script>
+let platform='Wildberries', latest='';
+document.querySelectorAll('[data-platform]').forEach(b=>b.addEventListener('click',()=>{platform=b.dataset.platform;document.querySelectorAll('[data-platform]').forEach(x=>x.classList.toggle('active',x===b))}));
+const $=id=>document.getElementById(id);
+function build(data){
+ const name=data.name, feat=data.features||'Подробные характеристики уточняйте у продавца.', audience=data.audience||'для повседневного использования';
+ const title=(name+' — практичный выбор на каждый день').slice(0,120);
+ const desc=`${name} подойдёт ${audience}. ${feat} Перед покупкой ознакомьтесь с характеристиками и комплектацией.`;
+ const benefits=(data.features?data.features.split(/[,.;\n]+/).map(x=>x.trim()).filter(Boolean).slice(0,5):['Практичное решение на каждый день','Удобно использовать дома и в дороге','Подходит для повседневных задач']);
+ const keywords=[name,data.category, ...name.toLowerCase().split(/\s+/), 'для дома','подарок'].filter(Boolean);
+ return {title,desc,benefits,keywords:[...new Set(keywords)].join(', ')};
+}
+function render(r){latest=`Заголовок\n${r.title}\n\nОписание\n${r.desc}\n\nПреимущества\n${r.benefits.map(x=>'• '+x).join('\n')}\n\nПоисковые фразы\n${r.keywords}`;
+ $('output').className='out';$('output').innerHTML=`<h3>ЗАГОЛОВОК</h3><p></p><h3>ОПИСАНИЕ</h3><p></p><h3>ПРЕИМУЩЕСТВА</h3><p></p><h3>ПОИСКОВЫЕ ФРАЗЫ</h3><p></p>`;
+ const ps=$('output').querySelectorAll('p');ps[0].textContent=r.title;ps[1].textContent=r.desc;ps[2].textContent=r.benefits.map(x=>'• '+x).join('\n');ps[3].textContent=r.keywords;
+ $('actions').hidden=false;
+}
+$('generate').addEventListener('click',async()=>{
+ const data={platform,name:$('name').value.trim(),category:$('category').value.trim(),features:$('features').value.trim(),audience:$('audience').value.trim(),tone:$('tone').value};
+ if(!data.name){$('name').focus();alert('Укажи название товара.');return}
+ const btn=$('generate');btn.disabled=true;btn.textContent='СОЗДАЁМ...';
+ try{
+  let r;
+  try{const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(res.ok){const j=await res.json();r=j.result||j}}
+  catch(e){}
+  if(!r)r=build(data);
+  if(typeof r==='string')r=build(data);
+  if(!r.title)r=build(data);
+  render(r);
+  const hist=JSON.parse(localStorage.getItem('seller-ai-history')||'[]');hist.unshift({name:data.name,platform,at:new Date().toLocaleString('ru-RU')});localStorage.setItem('seller-ai-history',JSON.stringify(hist.slice(0,5)));showHistory();
+ }finally{btn.disabled=false;btn.textContent='СОЗДАТЬ КАРТОЧКУ'}
+});
+function showHistory(){const h=JSON.parse(localStorage.getItem('seller-ai-history')||'[]');$('history').innerHTML=h.length?h.map(x=>`<div class="history-item">${escapeHtml(x.name)} · ${escapeHtml(x.platform)} · ${escapeHtml(x.at)}</div>`).join(''):'История пока пуста.'}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('copy').onclick=()=>navigator.clipboard.writeText(latest).then(()=>$('copy').textContent='Скопировано!');
+$('download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([latest],{type:'text/plain;charset=utf-8'}));a.download='seller-ai-card.txt';a.click();URL.revokeObjectURL(a.href)};
+showHistory();
+</script>
+</body></html>
